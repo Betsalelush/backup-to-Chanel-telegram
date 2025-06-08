@@ -26,6 +26,8 @@ class TelegramSender:
         self.last_processed_message_id: int = 0
         self.consecutive_successes: int = 0
         self.client_flood_wait_until: Dict[int, datetime] = {} # {auth_key_id: datetime_until}
+        self.target_channel_id: Optional[int] = None # יאחסן את ה-ID של ערוץ היעד
+        self.target_channel_is_forum: bool = False # יאחסן אם ערוץ היעד הוא פורום
 
         self.השהיה_בין_הודעות = 2
         self.מקס_הודעות_לדקה = 20
@@ -39,14 +41,14 @@ class TelegramSender:
                 with open(PROGRESS_FILE, 'r', encoding='utf-8') as f:
                     progress = json.load(f)
                 self.sent_message_ids = set(progress.get('sent_message_ids', []))
-                self.last_processed_message_id = progress.get('last_message_id', 0) # שונה ל-last_message_id
+                self.last_processed_message_id = progress.get('last_message_id', 0)
                 logger.info(f"✅ נטענה התקדמות קודמת: {len(self.sent_message_ids)} הודעות סומנו כנשלחו, מזהה ההודעה האחרונה שעיבדנו הוא {self.last_processed_message_id}")
                 return progress
             except Exception as e:
                 logger.error(f"שגיאה בטעינת התקדמות: {e}. מאפס התקדמות.")
         self.sent_message_ids = set()
         self.last_processed_message_id = 0
-        return {'sent_message_ids': [], 'last_message_id': 0} # שונה ל-last_message_id
+        return {'sent_message_ids': [], 'last_message_id': 0}
 
     def save_progress(self):
         """שמירת נתוני התקדמות לקובץ"""
@@ -59,7 +61,7 @@ class TelegramSender:
             
             progress_data = {
                 'sent_message_ids': list(self.sent_message_ids),
-                'last_message_id': self.last_processed_message_id # שונה ל-last_message_id
+                'last_message_id': self.last_processed_message_id
             }
             with open(PROGRESS_FILE, 'w', encoding='utf-8') as f:
                 json.dump(progress_data, f, ensure_ascii=False, indent=2)
@@ -376,7 +378,7 @@ class TelegramSender:
         """מחזיר גודל סבב אקראי בין 5 ל-15 הודעות."""
         return random.randint(5, 15)
 
-    async def send_single_message(self, client: TelegramClient, target_entity, source_message: Message, file_types: List[str]) -> bool:
+    async def send_single_message(self, client: TelegramClient, target_entity_id: int, target_entity_is_forum: bool, source_message: Message, file_types: List[str]) -> bool:
         """שליחת הודעה (טקסט או מדיה) מערוץ מקור לערוץ יעד."""
         client_name = getattr(client, '_account_info', 'לא ידוע')
         message_info = f"ID: {source_message.id}"
@@ -385,47 +387,26 @@ class TelegramSender:
         if client.session.auth_key.key_id in self.client_flood_wait_until and \
            datetime.now() < self.client_flood_wait_until[client.session.auth_key.key_id]:
             logger.warning(f"⏳ חשבון [{client_name}] עדיין נמצא בהמתנת FloodWait. מדלג על הודעה זו כרגע.")
-            return False # מציין שחשבון זה לא יכול לשלוח כעת
+            return False # מציין שחשבון זה לא יכול לשלוח כרגע
 
         try:
             await self.בדוק_הגבלות() # בדיקת קצב שליחה לפני כל ניסיון שליחה
 
-            effective_target_entity = target_entity
             message_thread_id = None
 
-            # אם היעד הוא Channel ויש לו קבוצת דיון מקושרת (linked_chat_id)
-            if isinstance(target_entity, Channel) and hasattr(target_entity, 'linked_chat_id') and target_entity.linked_chat_id:
-                try:
-                    linked_chat = await client.get_entity(target_entity.linked_chat_id)
-                    # וודא שהקבוצה המקושרת היא אכן Chat (Supergroup) ופורום
-                    if isinstance(linked_chat, Chat) and getattr(linked_chat, 'forum', False):
-                        effective_target_entity = linked_chat
-                        message_thread_id = 1 # ID של הנושא הכללי בפורום (ברוב המקרים 1)
-                        logger.info(f"💡 ערוץ יעד '{target_entity.title}' מקושר לפורום. שולח לנושא הכללי (ID: {message_thread_id}) בקבוצת הדיון המקושרת: {linked_chat.title}")
-                    else:
-                        # אם מקושר לקבוצה אבל לא פורום, שולח לקבוצה המקושרת ללא thread_id
-                        logger.warning(f"⚠️ ערוץ יעד '{target_entity.title}' מקושר לקבוצה ({linked_chat.title}), אך היא אינה פורום. הודעות יישלחו ישירות לקבוצה המקושרת ללא נושא.")
-                        effective_target_entity = linked_chat
-                        message_thread_id = None # וודא שאין message_thread_id
-                except Exception as e:
-                    logger.error(f"❌ שגיאה באחזור קבוצת הדיון המקושרת לערוץ {target_entity.title}: {e}. שולח ליעד המקורי.")
-                    # חוזר ליעד המקורי אם הייתה בעיה עם הקבוצה המקושרת
-                    effective_target_entity = target_entity
-                    message_thread_id = None # וודא שאין message_thread_id
-
-            # אם היעד הוא Chat (קבוצה) ומוגדר כפורום (ולא עבר דרך linked_chat_id מערוץ)
-            elif isinstance(target_entity, Chat) and getattr(target_entity, 'forum', False):
+            # אם היעד הוא Chat (קבוצה) ומוגדר כפורום (target_entity_is_forum נוצר מהבדיקה המקורית)
+            if target_entity_is_forum:
                  message_thread_id = 1 # ID של הנושא הכללי (בדרך כלל 1)
-                 logger.info(f"💡 ערוץ יעד '{target_entity.title}' הוא פורום. שולח לנושא הכללי (ID: {message_thread_id}).")
+                 logger.info(f"💡 ערוץ יעד הוא פורום. שולח לנושא הכללי (ID: {message_thread_id}).")
 
-            # קבל InputPeer עבור היעד האפקטיבי (הערוץ המקורי, הקבוצה המקושרת, או הקבוצה שהיא פורום)
-            input_effective_target_entity = await client.get_input_entity(effective_target_entity)
+            # קבל InputPeer עבור היעד האפקטיבי באמצעות ה-ID
+            input_effective_target_entity = await client.get_input_entity(target_entity_id)
 
             send_kwargs = {}
             if message_thread_id is not None:
                 send_kwargs['message_thread_id'] = message_thread_id
             
-            logger.debug(f"DEBUG: Attempting to send message {message_info} from [{client_name}] to target. Effective Target: {effective_target_entity.title} (Type: {type(effective_target_entity).__name__}), Thread ID: {message_thread_id}, Send_kwargs: {send_kwargs}")
+            logger.debug(f"DEBUG: Attempting to send message {message_info} from [{client_name}] to target ID: {target_entity_id}, Thread ID: {message_thread_id}, Send_kwargs: {send_kwargs}")
 
             # --- לוגיקה חדשה לשליחת הודעות ללא קרדיט ---
             if source_message.media:
@@ -503,7 +484,7 @@ class TelegramSender:
             self.consecutive_successes = 0 # איפוס מונה הצלחות
             return False
 
-    async def send_messages_batch(self, target_entity, messages: List[Message], file_types: List[str]) -> List[Message]:
+    async def send_messages_batch(self, messages: List[Message], file_types: List[str]) -> List[Message]:
         """שליחת אצווה של הודעות באמצעות מספר לקוחות באופן מבוקר."""
         tasks_with_messages = []
         messages_for_next_retry = [] # הודעות שצריכות ניסיון חוזר (לדוגמה, עקב FloodWait)
@@ -539,7 +520,8 @@ class TelegramSender:
                 continue # אין לקוחות זמינים כרגע להודעה זו
 
             client_for_task = await client_cycle.get()
-            tasks_with_messages.append((self.send_single_message(client_for_task, target_entity, message, file_types), message, client_for_task))
+            # קורא ל-send_single_message עם ה-ID של ערוץ היעד והאם הוא פורום
+            tasks_with_messages.append((self.send_single_message(client_for_task, self.target_channel_id, self.target_channel_is_forum, message, file_types), message, client_for_task))
             await client_cycle.put(client_for_task) # החזר את הלקוח לתור לסיבוב הבא
 
         # הפעל את המשימות במקביל
@@ -567,7 +549,7 @@ class TelegramSender:
         return messages_for_next_retry # החזר הודעות שצריכות ניסיון חוזר
 
 
-    async def send_messages_round(self, source_entity, target_entity, file_types: List[str], reset_progress: bool = False):
+    async def send_messages_round(self, source_entity, file_types: List[str], reset_progress: bool = False):
         """שליחת הודעות בסבבים עם חלוקה הוגנת בין החשבונות מערוץ מקור לערוץ יעד."""
         if not self.clients:
             logger.error("❌ אין חשבונות זמינים.")
@@ -583,7 +565,7 @@ class TelegramSender:
             current_fetch_offset_id = self.last_processed_message_id
             logger.info(f"✅ ימשיך העברת הודעות מ-ID: {current_fetch_offset_id} בערוץ המקור (יביא הודעות עם ID גבוה יותר).")
 
-        logger.info(f"📤 מתחיל העברת הודעות מ'{source_entity.title}' ל'{target_entity.title}' עם {len(self.clients)} חשבונות.")
+        logger.info(f"📤 מתחיל העברת הודעות מ'{source_entity.title}' ל'{self.target_channel_id}' עם {len(self.clients)} חשבונות.")
 
         messages_retrying_this_round = [] # הודעות שניסינו לשלוח באצווה הנוכחית ונצטרך לנסות שוב
         
@@ -634,7 +616,7 @@ class TelegramSender:
 
             if messages_to_process:
                 # שליחת האצווה וקבלת הודעות שניסיונן נכשל
-                messages_that_failed_in_batch = await self.send_messages_batch(target_entity, messages_to_process, file_types)
+                messages_that_failed_in_batch = await self.send_messages_batch(messages_to_process, file_types)
                 messages_retrying_this_round.extend(messages_that_failed_in_batch)
                 # כמה נשלחו בפועל באצווה זו (הודעות שהיו בתור לעיבוד פחות אלה שנכשלו)
                 total_sent_in_run += (len(messages_to_process) - len(messages_that_failed_in_batch)) 
@@ -667,51 +649,42 @@ class TelegramSender:
             logger.error("❌ לא נבחר ערוץ מקור, יוצא.")
             return
 
+        # בחירת ערוץ יעד ושמירת ה-ID שלו
         target_entity = await self.choose_target_channel(self.clients[0])
         if not target_entity:
             logger.error("❌ לא נבחר ערוץ יעד, יוצא.")
             return
         
-        # --- בדיקת שליחה מוקדמת לכל חשבון ---
+        self.target_channel_id = target_entity.id
+        self.target_channel_is_forum = getattr(target_entity, 'forum', False)
+
+        # --- בדיקת יכולת שליחה לערוץ היעד עבור כל החשבונות ---
         logger.info("\n--- בדיקת יכולת שליחה לערוץ היעד עבור כל החשבונות ---")
         for client in self.clients:
             client_name = getattr(client, '_account_info', 'לא ידוע')
             try:
                 # נסה לשלוח הודעת בדיקה קצרה
-                test_message_text = f"בדיקה: חשבון [{client_name}] יכול לשלוח לערוץ '{target_entity.title}'."
+                test_message_text = f"בדיקה: חשבון [{client_name}] יכול לשלוח לערוץ (ID: {self.target_channel_id})."
                 
-                effective_target_for_test = target_entity
                 test_thread_id = None
-                
-                # העתק את לוגיקת זיהוי הפורום גם לכאן לצורך בדיקה מדויקת
-                if isinstance(target_entity, Channel) and hasattr(target_entity, 'linked_chat_id') and target_entity.linked_chat_id:
-                    try:
-                        linked_chat_test = await client.get_entity(target_entity.linked_chat_id)
-                        if isinstance(linked_chat_test, Chat) and getattr(linked_chat_test, 'forum', False):
-                            effective_target_for_test = linked_chat_test
-                            test_thread_id = 1
-                    except Exception as e:
-                        logger.warning(f"⚠️ [{client_name}] שגיאה בבדיקת קבוצת דיון מקושרת עבור '{target_entity.title}': {e}")
-                elif isinstance(target_entity, Chat) and getattr(target_entity, 'forum', False):
+                # אם היעד הוא Chat (קבוצה) ומוגדר כפורום
+                if self.target_channel_is_forum:
                     test_thread_id = 1
                 
                 test_kwargs = {}
                 if test_thread_id is not None:
                     test_kwargs['message_thread_id'] = test_thread_id
 
-                await client.send_message(effective_target_for_test, message=test_message_text, **test_kwargs)
+                # שולח באמצעות ה-ID של ערוץ היעד
+                await client.send_message(self.target_channel_id, message=test_message_text, **test_kwargs)
                 logger.info(f"✅ חשבון [{client_name}] עבר את בדיקת השליחה לערוץ היעד.")
                 await asyncio.sleep(self.smart_delay()) # השהיה קצרה בין בדיקות
             except errors.ChannelInvalidError as e:
-                logger.critical(f"❌ חשבון [{client_name}] נכשל בבדיקת השליחה לערוץ היעד '{target_entity.title}'. שגיאה: {e}. יש לבדוק הרשאות או סוג ערוץ/קבוצה.")
-                # אם חשבון נכשל בבדיקה המוקדמת, נוציא אותו זמנית מרשימת הלקוחות הפעילים.
-                # חשוב: זה לא יגרום לו לצאת מהריצה כולה, רק לא להיבחר לשליחה.
-                if client.session.auth_key.key_id not in self.client_flood_wait_until: # וודא שזה לא סומן כבר כ-FloodWait
+                logger.critical(f"❌ חשבון [{client_name}] נכשל בבדיקת השליחה לערוץ היעד (ID: {self.target_channel_id}). שגיאה: {e}. יש לבדוק הרשאות או סוג ערוץ/קבוצה.")
+                if client.session.auth_key.key_id not in self.client_flood_wait_until:
                     self.client_flood_wait_until[client.session.auth_key.key_id] = datetime.now() + timedelta(days=999) # סמן כחסום לתמיד לצורך הבדיקה
-                # ניתן גם להוציא מהרשימה ממש: self.clients.remove(client)
-                # אך עדיף לסמן אותו כך שהוא לא יבחר לשליחה.
             except Exception as e:
-                logger.critical(f"❌ חשבון [{client_name}] נכשל בבדיקת השליחה לערוץ היעד '{target_entity.title}' עם שגיאה לא צפויה: {e}", exc_info=True)
+                logger.critical(f"❌ חשבון [{client_name}] נכשל בבדיקת השליחה לערוץ היעד (ID: {self.target_channel_id}) עם שגיאה לא צפויה: {e}", exc_info=True)
                 if client.session.auth_key.key_id not in self.client_flood_wait_until:
                     self.client_flood_wait_until[client.session.auth_key.key_id] = datetime.now() + timedelta(days=999) # סמן כחסום לתמיד
 
@@ -740,7 +713,7 @@ class TelegramSender:
             reset_progress = self.choose_reset_progress()
 
         try:
-            await self.send_messages_round(source_entity, target_entity, file_types, reset_progress)
+            await self.send_messages_round(source_entity, file_types, reset_progress)
             logger.info("\n🎉 העברת ההודעות הושלמה בהצלחה!")
 
         except KeyboardInterrupt:
