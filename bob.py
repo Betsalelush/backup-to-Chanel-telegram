@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 class מעביר_טלגרם:
     def __init__(self):
         # טעינת הגדרות API מקובץ או משתני סביבה
-        self.API_ID = self._get_config('API_ID', 21135587)
-        self.API_HASH = self._get_config('API_HASH', '2cb207bbd8229fe12a7dbc2fcc481ce1')
+        self.API_ID = self._get_config('API_ID', )
+        self.API_HASH = self._get_config('API_HASH', '')
         self.PHONE_NUMBER = None
         
         self.לקוח = None
