@@ -1,48 +1,34 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth } from '../../contexts/AuthContext'
 import {
+  Bars3Icon,
   BellIcon,
   UserCircleIcon,
-  Cog6ToothIcon,
-  ArrowRightOnRectangleIcon,
-  SunIcon,
-  MoonIcon,
-  LanguageIcon
+  ArrowLeftOnRectangleIcon,
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline'
-import { useAuth } from '../../contexts/AuthContext'
-import { useTheme } from '../../contexts/ThemeContext'
-import { useWebSocket } from '../../contexts/WebSocketContext'
 
 const Header = ({ connectionStatus }) => {
   const { user, logout } = useAuth()
-  const { theme, setTheme, language, setLanguage } = useTheme()
-  const { messageHistory } = useWebSocket()
-  const [showNotifications, setShowNotifications] = useState(false)
-  const [showProfile, setShowProfile] = useState(false)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
-  // Get recent notifications
-  const recentNotifications = messageHistory
-    .filter(msg => msg.type === 'system_notification' || msg.type === 'error_notification')
-    .slice(0, 5)
-
-  const unreadCount = recentNotifications.length
-
-  const getConnectionStatusColor = () => {
-    switch (connectionStatus) {
+  const getConnectionStatusColor = (status) => {
+    switch (status) {
       case 'connected':
-        return 'text-green-500'
+        return 'bg-green-500'
       case 'connecting':
-        return 'text-yellow-500'
+        return 'bg-yellow-500'
       case 'disconnected':
       case 'error':
-        return 'text-red-500'
+        return 'bg-red-500'
       default:
-        return 'text-slate-500'
+        return 'bg-gray-500'
     }
   }
 
-  const getConnectionStatusText = () => {
-    switch (connectionStatus) {
+  const getConnectionStatusText = (status) => {
+    switch (status) {
       case 'connected':
         return 'מחובר'
       case 'connecting':
@@ -50,176 +36,106 @@ const Header = ({ connectionStatus }) => {
       case 'disconnected':
         return 'מנותק'
       case 'error':
-        return 'שגיאה בחיבור'
+        return 'שגיאה'
       default:
         return 'לא ידוע'
     }
   }
 
   return (
-    <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
-      <div className="flex items-center justify-between">
-        {/* Left side - Connection status */}
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${
-              connectionStatus === 'connected' ? 'bg-green-500 animate-pulse' :
-              connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
-              'bg-red-500'
-            }`}></div>
-            <span className={`text-sm font-medium ${getConnectionStatusColor()}`}>
-              {getConnectionStatusText()}
-            </span>
-          </div>
-        </div>
-
-        {/* Center - Page title */}
-        <div className="flex-1 text-center">
-          <h2 className="text-lg font-semibold text-white">
-            מערכת ניהול הודעות טלגרם
-          </h2>
-        </div>
-
-        {/* Right side - User menu */}
-        <div className="flex items-center space-x-4">
-          {/* Notifications */}
-          <div className="relative">
+    <header className="bg-slate-800 border-b border-slate-700 shadow-sm">
+      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          {/* Mobile menu button */}
+          <div className="flex items-center lg:hidden">
             <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-700"
+              type="button"
+              className="inline-flex items-center justify-center p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
             >
-              <BellIcon className="h-6 w-6" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
+              <Bars3Icon className="h-6 w-6" aria-hidden="true" />
             </button>
-
-            <AnimatePresence>
-              {showNotifications && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute left-0 mt-2 w-80 bg-slate-800 border border-slate-600 rounded-lg shadow-lg z-50"
-                >
-                  <div className="p-4 border-b border-slate-600">
-                    <h3 className="text-sm font-medium text-white">התראות אחרונות</h3>
-                  </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    {recentNotifications.length > 0 ? (
-                      recentNotifications.map((notification, index) => (
-                        <div key={index} className="p-3 border-b border-slate-600 last:border-b-0 hover:bg-slate-700">
-                          <div className="flex items-start space-x-3">
-                            <div className={`w-2 h-2 rounded-full mt-2 ${
-                              notification.type === 'error_notification' ? 'bg-red-500' : 'bg-blue-500'
-                            }`}></div>
-                            <div className="flex-1">
-                              <p className="text-sm text-slate-300">
-                                {notification.data?.message || notification.data?.text || 'התראה'}
-                              </p>
-                              <p className="text-xs text-slate-500 mt-1">
-                                {new Date(notification.timestamp).toLocaleString('he-IL')}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-4 text-center text-slate-400">
-                        <BellIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">אין התראות חדשות</p>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
-          {/* Language toggle */}
-          <button
-            onClick={() => setLanguage(language === 'he' ? 'en' : 'he')}
-            className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-700"
-            title={language === 'he' ? 'Switch to English' : 'עבור לעברית'}
-          >
-            <LanguageIcon className="h-6 w-6" />
-          </button>
-
-          {/* Theme toggle */}
-          <button
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-700"
-            title={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}
-          >
-            {theme === 'dark' ? (
-              <SunIcon className="h-6 w-6" />
-            ) : (
-              <MoonIcon className="h-6 w-6" />
-            )}
-          </button>
-
-          {/* User menu */}
-          <div className="relative">
-            <button
-              onClick={() => setShowProfile(!showProfile)}
-              className="flex items-center space-x-3 p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-700"
-            >
-              <UserCircleIcon className="h-8 w-8" />
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-white">{user?.username || 'משתמש'}</p>
-                <p className="text-xs text-slate-400">מנהל מערכת</p>
+          {/* Connection Status */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${getConnectionStatusColor(connectionStatus)}`}>
+                {connectionStatus === 'connecting' && (
+                  <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+                )}
               </div>
+              <span className="text-sm text-slate-300">
+                {getConnectionStatusText(connectionStatus)}
+              </span>
+            </div>
+          </div>
+
+          {/* Right section */}
+          <div className="flex items-center space-x-4">
+            {/* Notifications */}
+            <button
+              type="button"
+              className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <BellIcon className="h-6 w-6" aria-hidden="true" />
             </button>
 
-            <AnimatePresence>
-              {showProfile && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute left-0 mt-2 w-48 bg-slate-800 border border-slate-600 rounded-lg shadow-lg z-50"
-                >
-                  <div className="p-2">
-                    <button
-                      onClick={() => {
-                        setShowProfile(false)
-                        // Navigate to settings
-                      }}
-                      className="flex items-center w-full px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            {/* User menu */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center space-x-2 p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <UserCircleIcon className="h-8 w-8" aria-hidden="true" />
+                <span className="text-sm font-medium text-slate-300">
+                  {user?.username || 'משתמש'}
+                </span>
+              </button>
+
+              {/* Dropdown menu */}
+              <AnimatePresence>
+                {isDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.1 }}
+                    className="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-slate-700 ring-1 ring-black ring-opacity-5 z-50"
+                  >
+                    <div
+                      className="py-1"
+                      role="menu"
+                      aria-orientation="vertical"
+                      aria-labelledby="user-menu"
                     >
-                      <Cog6ToothIcon className="h-4 w-4 mr-3" />
-                      הגדרות
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowProfile(false)
-                        logout()
-                      }}
-                      className="flex items-center w-full px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-slate-700 rounded-lg transition-colors"
-                    >
-                      <ArrowRightOnRectangleIcon className="h-4 w-4 mr-3" />
-                      התנתקות
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                      <a
+                        href="/settings"
+                        className="flex items-center px-4 py-2 text-sm text-slate-300 hover:bg-slate-600 hover:text-white"
+                        role="menuitem"
+                      >
+                        <Cog6ToothIcon className="ml-3 h-4 w-4" aria-hidden="true" />
+                        הגדרות
+                      </a>
+                      <button
+                        onClick={() => {
+                          logout()
+                          setIsDropdownOpen(false)
+                        }}
+                        className="flex items-center w-full text-right px-4 py-2 text-sm text-slate-300 hover:bg-slate-600 hover:text-white"
+                        role="menuitem"
+                      >
+                        <ArrowLeftOnRectangleIcon className="ml-3 h-4 w-4" aria-hidden="true" />
+                        יציאה
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Click outside to close dropdowns */}
-      {(showNotifications || showProfile) && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => {
-            setShowNotifications(false)
-            setShowProfile(false)
-          }}
-        />
-      )}
     </header>
   )
 }
