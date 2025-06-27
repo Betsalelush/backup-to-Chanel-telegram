@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useReducer, useCallback, u
 import toast from 'react-hot-toast'
 import { useAuth } from './AuthContext'
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8001/api/ws'
+const WS_URL = import.meta.env.REACT_APP_BACKEND_URL?.replace('https://', 'wss://').replace('http://', 'ws://') + '/api/ws' || import.meta.env.VITE_WS_URL || 'ws://localhost:8001/api/ws'
 
 // Initial state
 const initialState = {
