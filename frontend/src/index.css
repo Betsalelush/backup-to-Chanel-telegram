@@ -1,0 +1,327 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Hebrew/RTL Support */
+[dir="rtl"] {
+  font-family: 'Heebo', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-slate-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-600 rounded-lg;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-500;
+}
+
+/* Custom animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.3s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
+
+/* Custom components */
+.card {
+  @apply bg-slate-800 border border-slate-700 rounded-lg shadow-lg;
+}
+
+.card-header {
+  @apply px-6 py-4 border-b border-slate-700;
+}
+
+.card-content {
+  @apply px-6 py-4;
+}
+
+.card-footer {
+  @apply px-6 py-4 border-t border-slate-700;
+}
+
+.btn {
+  @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900;
+}
+
+.btn-primary {
+  @apply btn bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+}
+
+.btn-secondary {
+  @apply btn bg-slate-600 text-white hover:bg-slate-700 focus:ring-slate-500;
+}
+
+.btn-success {
+  @apply btn bg-green-600 text-white hover:bg-green-700 focus:ring-green-500;
+}
+
+.btn-danger {
+  @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+}
+
+.btn-warning {
+  @apply btn bg-yellow-600 text-white hover:bg-yellow-700 focus:ring-yellow-500;
+}
+
+.btn-ghost {
+  @apply btn bg-transparent text-slate-300 hover:bg-slate-700 hover:text-white focus:ring-slate-500;
+}
+
+.form-input {
+  @apply w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-slate-300 mb-1;
+}
+
+.form-error {
+  @apply text-red-400 text-sm mt-1;
+}
+
+.status-badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.status-running {
+  @apply status-badge bg-green-100 text-green-800;
+}
+
+.status-pending {
+  @apply status-badge bg-yellow-100 text-yellow-800;
+}
+
+.status-stopped {
+  @apply status-badge bg-red-100 text-red-800;
+}
+
+.status-completed {
+  @apply status-badge bg-blue-100 text-blue-800;
+}
+
+.status-failed {
+  @apply status-badge bg-red-100 text-red-800;
+}
+
+/* Loading states */
+.skeleton {
+  @apply animate-pulse bg-slate-700 rounded;
+}
+
+.skeleton-text {
+  @apply skeleton h-4 w-3/4 mb-2;
+}
+
+.skeleton-title {
+  @apply skeleton h-6 w-1/2 mb-4;
+}
+
+.skeleton-avatar {
+  @apply skeleton h-10 w-10 rounded-full;
+}
+
+/* Progress bars */
+.progress-bar {
+  @apply w-full bg-slate-700 rounded-full h-2;
+}
+
+.progress-fill {
+  @apply h-2 rounded-full transition-all duration-300;
+}
+
+.progress-success {
+  @apply progress-fill bg-green-500;
+}
+
+.progress-warning {
+  @apply progress-fill bg-yellow-500;
+}
+
+.progress-danger {
+  @apply progress-fill bg-red-500;
+}
+
+/* Tables */
+.table {
+  @apply w-full text-sm text-right;
+}
+
+.table th {
+  @apply px-6 py-3 bg-slate-700 text-slate-300 font-medium uppercase tracking-wider;
+}
+
+.table td {
+  @apply px-6 py-4 border-b border-slate-700 text-slate-300;
+}
+
+.table tr:hover {
+  @apply bg-slate-700;
+}
+
+/* Charts */
+.recharts-wrapper {
+  direction: ltr;
+}
+
+/* Dark mode adjustments */
+.dark {
+  color-scheme: dark;
+}
+
+/* QR Code styling */
+.qr-code {
+  @apply bg-white p-4 rounded-lg inline-block;
+}
+
+.qr-code pre {
+  @apply text-black font-mono text-xs leading-3;
+}
+
+/* Notification styles */
+.notification {
+  @apply fixed top-4 right-4 max-w-sm bg-slate-800 border border-slate-600 rounded-lg shadow-lg p-4 z-50;
+}
+
+.notification-success {
+  @apply notification border-green-500;
+}
+
+.notification-error {
+  @apply notification border-red-500;
+}
+
+.notification-warning {
+  @apply notification border-yellow-500;
+}
+
+.notification-info {
+  @apply notification border-blue-500;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .card {
+    @apply mx-2;
+  }
+  
+  .card-header {
+    @apply px-4 py-3;
+  }
+  
+  .card-content {
+    @apply px-4 py-3;
+  }
+  
+  .card-footer {
+    @apply px-4 py-3;
+  }
+  
+  .btn {
+    @apply px-3 py-2 text-sm;
+  }
+  
+  .table th,
+  .table td {
+    @apply px-3 py-2;
+  }
+}
+
+/* Focus management for accessibility */
+.focus-visible:focus {
+  @apply outline-none ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-only {
+    display: block !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .card {
+    @apply border-2;
+  }
+  
+  .btn {
+    @apply border-2 border-current;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
